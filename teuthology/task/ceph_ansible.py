@@ -3,22 +3,24 @@ import os
 import re
 import logging
 import yaml
+import time
 
 from cStringIO import StringIO
 
 from . import Task
 from tempfile import NamedTemporaryFile
 from ..config import config as teuth_config
-from ..misc import get_scratch_devices
+from ..misc import get_scratch_devices,  reconnect
 from teuthology import contextutil
 from teuthology.orchestra import run
+from teuthology.nuke import remove_osd_mounts, remove_ceph_packages
+
 from teuthology import misc
 log = logging.getLogger(__name__)
 
 
 class CephAnsible(Task):
     name = 'ceph_ansible'
-
     __doc__ = """
     A task to setup ceph cluster using ceph-ansible
 
@@ -26,6 +28,9 @@ class CephAnsible(Task):
         repo: {git_base}ceph-ansible.git
         branch: mybranch # defaults to master
         ansible-version: 2.2 # defaults to 2.2.1
+        # for old ansible version where clients roles
+        # doesn't exist, use setup-clients options
+        setup-clients: true
         vars:
           ceph_dev: True ( default)
           ceph_conf_overrides:
@@ -57,9 +62,16 @@ class CephAnsible(Task):
         self.playbook = None
         if 'playbook' in config:
             self.playbook = self.config['playbook']
+        if 'setup-clients' in config:
+            # use playbook that doesn't support ceph-client roles
+            self.playbook = self._default_rh_playbook
         if 'repo' not in config:
             self.config['repo'] = os.path.join(teuth_config.ceph_git_base_url,
                                                'ceph-ansible.git')
+
+        # for downstream bulids skip var setup
+        if 'rhbuild' in config:
+            return
         # default vars to dev builds
         if 'vars' not in config:
             vars = dict()
@@ -128,9 +140,9 @@ class CephAnsible(Task):
         for group in sorted(self.groups_to_roles.keys()):
             role_prefix = self.groups_to_roles[group]
             want = lambda role: role.startswith(role_prefix)
-            for (remote, roles) in self.cluster.only(want).remotes.iteritems():
-                hostname = remote.hostname
-                host_vars = self.get_host_vars(remote)
+            for (remot, roles) in self.cluster.only(want).remotes.iteritems():
+                hostname = remot.hostname
+                host_vars = self.get_host_vars(remot)
                 if group not in hosts_dict:
                     hosts_dict[group] = {hostname: host_vars}
                 elif hostname not in hosts_dict[group]:
@@ -318,8 +330,25 @@ class CephAnsible(Task):
         return host_vars
 
     def run_rh_playbook(self):
-        ceph_installer = self.ceph_installer
         args = self.args
+        try:
+            (ceph_installer,) = self.ctx.cluster.only('installer.0').remotes
+        except ValueError:
+            log.info("using first monitor as installer node")
+            (ceph_installer,) = self.ctx.cluster.only('mon.a').remotes
+        from tasks.set_repo import GA_BUILDS, set_cdn_repo
+        rhbuild = self.config.get('rhbuild')
+        if rhbuild in GA_BUILDS:
+            set_cdn_repo(self.ctx, self.config)
+        # install ceph-ansible
+        if ceph_installer.os.package_type == 'rpm':
+            ceph_installer.run(args=[
+                'sudo',
+                'yum',
+                'install',
+                '-y',
+                'ceph-ansible'])
+            time.sleep(4)
         ceph_installer.run(args=[
             'cp',
             '-R',
@@ -340,11 +369,16 @@ class CephAnsible(Task):
             check_status=False,
             stdout=out
         )
-        log.info(out.getvalue())
+        # log.info(out.getvalue())
         if re.search(r'all hosts have already failed', out.getvalue()):
             log.error("Failed during ceph-ansible execution")
             raise CephAnsibleError("Failed during ceph-ansible execution")
         self._create_rbd_pool()
+        # old ansible doesn't have clients role, setup clients for those
+        # cases
+        if self.config.get('setup-clients'):
+            self.setup_client_node()
+        self.wait_for_ceph_health()
 
     def run_playbook(self):
         # setup ansible on first mon node
@@ -434,7 +468,7 @@ class CephAnsible(Task):
             run.Raw(';'),
             'pip',
             'install',
-            run.Raw('setuptools>=11.3'),
+            'setuptools>=11.3',
             run.Raw(ansible_ver),
             run.Raw(';'),
             run.Raw(str_args)
