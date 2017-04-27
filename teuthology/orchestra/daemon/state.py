@@ -1,30 +1,26 @@
 import logging
-import struct
 import re
-
+import struct
 from cStringIO import StringIO
 
-from . import run
-from .. import misc
 from teuthology.exceptions import CommandFailedError
+from teuthology.orchestra import run
 
 log = logging.getLogger(__name__)
+systemd_cmd_templ = 'sudo systemctl {action} {daemon}@{id_}'
 
-start_mon_cmd = 'sudo systemctl start ceph-mon@'
-stop_mon_cmd = 'sudo systemctl stop ceph-mon@'
-restart_mon_cmd = 'sudo systemctl restart ceph-mon@'
 
-start_osd_cmd = 'sudo systemctl start ceph-osd@'
-stop_osd_cmd = 'sudo systemctl stop ceph-osd@'
-restart_osd_cmd = 'sudo systemctl restart ceph-osd@'
-
-start_mds_cmd = 'sudo systemctl start ceph-mds@'
-stop_mds_cmd = 'sudo systemctl stop ceph-mds@'
-restart_mds_cmd = 'sudo systemctl restart ceph-mds@'
-
-start_rgw_cmd = 'sudo systemctl start ceph-radosgw@rgw.'
-stop_rgw_cmd = 'sudo systemctl stop ceph-radosgw@rgw.'
-restart_rgw_cmd = 'sudo systemctl restart ceph-radosgw@rgw.'
+def get_systemd_cmd(action, daemon, id_):
+    if daemon == 'rgw':
+        daemon = 'radosgw'
+        id_ = 'rgw.%s' % id_
+    daemon = 'ceph-%s' % daemon
+    cmd = systemd_cmd_templ.format(
+        action=action,
+        daemon=daemon,
+        id_=id_,
+    )
+    return cmd
 
 
 class DaemonState(object):
@@ -46,6 +42,7 @@ class DaemonState(object):
         self.command_args = command_args
         self.command_kwargs = command_kwargs
         self.role = role
+        self.type_ = self.role.split('.')[-1]
         self.id_ = id_
         self.use_init = use_init
         if self.use_init:
@@ -107,11 +104,11 @@ class DaemonState(object):
             self.proc.stdin.close()
             self.log.debug('waiting for process to exit')
             try:
-               run.wait([self.proc], timeout=timeout)
+                run.wait([self.proc], timeout=timeout)
             except CommandFailedError:
-               log.exception("Error while waiting for process to exit")
+                log.exception("Error while waiting for process to exit")
             self.proc = None
-            self.log.info('Stopped')
+        self.log.info('Stopped')
 
     def start(self, timeout=300):
         """
@@ -298,166 +295,3 @@ class DaemonState(object):
                     self.remote,
                 )
             return exit_code
-
-
-
-
-
-class DaemonGroup(object):
-    """
-    Collection of daemon state instances
-    """
-    def __init__(self, use_init=False):
-        """
-        self.daemons is a dictionary indexed by role.  Each entry is a
-        dictionary of DaemonState values indexed by an id parameter.
-        """
-        self.daemons = {}
-        self.use_init = use_init
-
-    def add_daemon(self, remote, type_, id_, *args, **kwargs):
-        """
-        Add a daemon.  If there already is a daemon for this id_ and role, stop
-        that daemon and.  Restart the damon once the new value is set.
-
-        :param remote: Remote site
-        :param type_: type of daemon (osd, mds, mon, rgw,  for example)
-        :param id_: Id (index into role dictionary)
-        :param args: Daemonstate positional parameters
-        :param kwargs: Daemonstate keyword parameters
-        """
-        # for backwards compatibility with older ceph-qa-suite branches,
-        # we can only get optional args from unused kwargs entries
-        self.register_daemon(remote, type_, id_, *args, **kwargs)
-        cluster = kwargs.pop('cluster', 'ceph')
-        role = cluster + '.' + type_
-        if not self.use_init:
-            self.daemons[role][id_].restart()
-
-    def register_daemon(self, remote, type_, id_, *args, **kwargs):
-        """
-        Add a daemon.  If there already is a daemon for this id_ and role, stop
-        that daemon.
-        :param remote: Remote site
-        :param type_: type of daemon (osd, mds, mon, rgw,  for example)
-        :param id_: Id (index into role dictionary)
-        :param args: Daemonstate positional parameters
-        :param kwargs: Daemonstate keyword parameters
-        """
-        # for backwards compatibility with older ceph-qa-suite branches,
-        # we can only get optional args from unused kwargs entries
-        cluster = kwargs.pop('cluster', 'ceph')
-        role = cluster + '.' + type_
-        if role not in self.daemons:
-            self.daemons[role] = {}
-        if id_ in self.daemons[role]:
-            self.daemons[role][id_].stop()
-            self.daemons[role][id_] = None
-        self.daemons[role][id_] = DaemonState(
-            remote, role, id_, self.use_init, *args, **kwargs)
-
-    def get_daemon(self, type_, id_, cluster='ceph'):
-        """
-        get the daemon associated with this id_ for this role.
-
-        :param type_: type of daemon (osd, mds, mon, rgw,  for example)
-        :param id_: Id (index into role dictionary)
-        """
-        role = cluster + '.' + type_
-        if role not in self.daemons:
-            return None
-        return self.daemons[role].get(str(id_), None)
-
-    def iter_daemons_of_role(self, type_, cluster='ceph'):
-        """
-        Iterate through all daemon instances for this role.  Return dictionary
-        of daemon values.
-
-        :param type_: type of daemon (osd, mds, mon, rgw,  for example)
-        """
-        role = cluster + '.' + type_
-        return self.daemons.get(role, {}).values()
-
-    def resolve_role_list(self, roles, types, cluster_aware=False):
-        """
-        Resolve a configuration setting that may be None or contain wildcards
-        into a list of roles (where a role is e.g. 'mds.a' or 'osd.0').  This
-        is useful for tasks that take user input specifying a flexible subset
-        of the available roles.
-
-        The task calling this must specify what kinds of roles it can can
-        handle using the ``types`` argument, where a role type is 'osd' or
-        'mds' for example.  When selecting roles this is used as a filter, or
-        when an explicit list of roles is passed, the an exception is raised if
-        any are not of a suitable type.
-
-        Examples:
-
-        ::
-
-            # Passing None (i.e. user left config blank) defaults to all roles
-            # (filtered by ``types``)
-            None, types=['osd', 'mds', 'mon'] ->
-              ['osd.0', 'osd.1', 'osd.2', 'mds.a', mds.b', 'mon.a']
-            # Wildcards are expanded
-            roles=['mds.*', 'osd.0'], types=['osd', 'mds', 'mon'] ->
-              ['mds.a', 'mds.b', 'osd.0']
-            # Boring lists are unaltered
-            roles=['osd.0', 'mds.a'], types=['osd', 'mds', 'mon'] ->
-              ['osd.0', 'mds.a']
-            # Entries in role list that don't match types result in an
-            # exception
-            roles=['osd.0', 'mds.a'], types=['osd'] -> RuntimeError
-
-        :param roles: List (of roles or wildcards) or None (select all suitable
-                      roles)
-        :param types: List of acceptable role types, for example
-                      ['osd', 'mds'].
-        :param cluster_aware: bool to determine whether to consider include
-                              cluster in the returned roles - just for
-                              backwards compatibility with pre-jewel versions
-                              of ceph-qa-suite
-        :return: List of strings like ["mds.0", "osd.2"]
-        """
-        assert (isinstance(roles, list) or roles is None)
-
-        resolved = []
-        if roles is None:
-            # Handle default: all roles available
-            for type_ in types:
-                for role, daemons in self.daemons.items():
-                    if not role.endswith('.' + type_):
-                        continue
-                    for daemon in daemons.values():
-                        prefix = type_
-                        if cluster_aware:
-                            prefix = daemon.role
-                        resolved.append(prefix + '.' + daemon.id_)
-        else:
-            # Handle explicit list of roles or wildcards
-            for raw_role in roles:
-                try:
-                    cluster, role_type, role_id = misc.split_role(raw_role)
-                except ValueError:
-                    msg = ("Invalid role '{0}', roles must be of format "
-                           "[<cluster>.]<type>.<id>").format(raw_role)
-                    raise RuntimeError(msg)
-
-                if role_type not in types:
-                    msg = "Invalid role type '{0}' in role '{1}'".format(
-                        role_type, raw_role)
-                    raise RuntimeError(msg)
-
-                if role_id == "*":
-                    # Handle wildcard, all roles of the type
-                    for daemon in self.iter_daemons_of_role(role_type,
-                                                            cluster=cluster):
-                        prefix = role_type
-                        if cluster_aware:
-                            prefix = daemon.role
-                        resolved.append(prefix + '.' + daemon.id_)
-                else:
-                    # Handle explicit role
-                    resolved.append(raw_role)
-
-        return resolved
