@@ -192,7 +192,6 @@ class CephAnsible(Task):
         if self.playbook is not None:
             os.remove(self.playbook_file)
         os.remove(self.extra_vars_file)
-        # collect logs
         self.collect_logs()
         # run purge-cluster that teardowns the cluster
         args = [
