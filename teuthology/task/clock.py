@@ -32,12 +32,12 @@ def task(ctx, config):
 
     log.info('Syncing clocks and checking initial clock skew...')
     for rem in ctx.cluster.remotes.iterkeys():
-        ntpconf = rem.get_file('/etc/ntp.conf')
-        servers = [
-            l.strip().split()[1] for l in open(ntpconf, 'r').readlines()
-            if l.startswith('server')
-        ]
-        os.remove(ntpconf)
+        #ntpconf = rem.get_file('/etc/ntp.conf')
+        #servers = [
+        #    l.strip().split()[1] for l in open(ntpconf, 'r').readlines()
+        #    if l.startswith('server')
+        #]
+        #os.remove(ntpconf)
         # CentOS calls it ntpd, Xenial/Trusty are ntp.  Thanks guys.
         args = [
             'sudo', 'service', 'ntp', 'stop',
@@ -47,7 +47,7 @@ def task(ctx, config):
             'sudo',
             'ntpdate',
         ]
-        args.extend(servers)
+        #args.extend(servers)
         args.extend([
             run.Raw(';'),
             'sudo', 'service', 'ntp', 'start',
