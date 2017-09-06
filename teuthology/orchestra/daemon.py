@@ -291,6 +291,24 @@ class DaemonGroup(object):
         """
         # for backwards compatibility with older ceph-qa-suite branches,
         # we can only get optional args from unused kwargs entries
+        self.register_daemon(remote, type_, id_, *args, **kwargs)
+        cluster = kwargs.pop('cluster', 'ceph')
+        role = cluster + '.' + type_
+        if not self.use_init:
+            self.daemons[role][id_].restart()
+
+    def register_daemon(self, remote, type_, id_, *args, **kwargs):
+        """
+        Add a daemon.  If there already is a daemon for this id_ and role, stop
+        that daemon.
+        :param remote: Remote site
+        :param type_: type of daemon (osd, mds, mon, rgw,  for example)
+        :param id_: Id (index into role dictionary)
+        :param args: Daemonstate positional parameters
+        :param kwargs: Daemonstate keyword parameters
+        """
+        # for backwards compatibility with older ceph-qa-suite branches,
+        # we can only get optional args from unused kwargs entries
         cluster = kwargs.pop('cluster', 'ceph')
         role = cluster + '.' + type_
         if role not in self.daemons:
@@ -298,10 +316,7 @@ class DaemonGroup(object):
         if id_ in self.daemons[role]:
             self.daemons[role][id_].stop()
             self.daemons[role][id_] = None
-        self.daemons[role][id_] = DaemonState(remote, role, id_, self.use_init, *args,
-                                              **kwargs)
-        if not self.use_init:
-            self.daemons[role][id_].restart()
+        self.daemons[role][id_] = DaemonState(remote, role, id_, *args, **kwargs)
 
     def get_daemon(self, type_, id_, cluster='ceph'):
         """
