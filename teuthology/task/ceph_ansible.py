@@ -258,6 +258,8 @@ class CephAnsible(Task):
             host_vars['monitor_interface'] = remote.interface
         if 'public_network' not in extra_vars:
             host_vars['public_network'] = remote.cidr
+        if 'radosgw_interface' not in extra_vars:
+            host_vars['radosgw_interface'] = remote.interface
         return host_vars
 
     def run_rh_playbook(self):
