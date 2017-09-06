@@ -52,9 +52,6 @@ class CephAnsible(Task):
         self.playbook = None
         if 'playbook' in config:
             self.playbook = self.config['playbook']
-        if 'setup-clients' in config:
-            # use playbook that doesn't support ceph-client roles
-            self.playbook = self._default_rh_playbook
         if 'repo' not in config:
             self.config['repo'] = os.path.join(teuth_config.ceph_git_base_url,
                                                'ceph-ansible.git')
