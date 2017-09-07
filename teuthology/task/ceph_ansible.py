@@ -373,8 +373,7 @@ class CephAnsible(Task):
         self._create_rbd_pool()
         # old ansible doesn't have clients role, setup clients for those
         # cases
-        if self.config.get('setup-clients'):
-            self.setup_client_node()
+        self.fix_keyring_permission()
         self.wait_for_ceph_health()
 
     def run_playbook(self):
