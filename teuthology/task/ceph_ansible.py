@@ -214,7 +214,6 @@ class CephAnsible(Task):
                 args=[
                     run.Raw('cd ~/ceph-ansible'),
                     run.Raw(';'),
-                    'ANSIBLE_LIBRARY=/usr/share/ceph-ansible/library/',
                     run.Raw(str_args)
                 ]
             )
@@ -225,7 +224,6 @@ class CephAnsible(Task):
                     run.Raw(';'),
                     run.Raw('source venv/bin/activate'),
                     run.Raw(';'),
-                    'ANSIBLE_LIBRARY=~/ceph-ansible/library/',
                     run.Raw(str_args)
                 ]
             )
