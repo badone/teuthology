@@ -193,17 +193,25 @@ class CephAnsible(Task):
             'ANSIBLE_STDOUT_CALLBACK=debug',
             'ansible-playbook', '-vv',
             '-e', 'ireallymeanit=yes',
-            '-i', 'inven.yml', 'infrastructure-playbooks/purge-cluster.yml'
+            '-i', 'inven.yml', 'purge-cluster.yml'
         ]
         log.debug("Running %s", args)
         str_args = ' '.join(args)
         installer_node = self.ceph_installer
+        # copy purge-cluster playbook from infra dir to top level dir
+        # as required by ceph-ansible
+        installer_node.run(
+            args=[
+                'cp',
+                run.Raw('~/ceph-ansible/infrastructure-playbooks/purge-cluster.yml'),
+                run.Raw('~/ceph-ansible/'),
+            ]
+        )
         if self.config.get('rhbuild'):
             installer_node.run(
                 args=[
                     run.Raw('cd ~/ceph-ansible'),
                     run.Raw(';'),
-                    'ANSIBLE_LIBRARY=/usr/share/ceph-ansible/library/',
                     run.Raw(str_args)
                 ]
             )
@@ -214,7 +222,6 @@ class CephAnsible(Task):
                     run.Raw(';'),
                     run.Raw('source venv/bin/activate'),
                     run.Raw(';'),
-                    'ANSIBLE_LIBRARY=~/ceph-ansible/library/',
                     run.Raw(str_args)
                 ]
             )
