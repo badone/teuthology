@@ -73,6 +73,8 @@ class CephAnsible(Task):
             vars = dict()
             config['vars'] = vars
         vars = config['vars']
+        # copy admin key by default needed by workunits
+        vars['copy_admin_key'] = True
         if 'ceph_dev' not in vars:
             vars['ceph_dev'] = True
         if 'ceph_dev_key' not in vars:
