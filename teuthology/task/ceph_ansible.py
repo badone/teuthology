@@ -73,8 +73,6 @@ class CephAnsible(Task):
             vars = dict()
             config['vars'] = vars
         vars = config['vars']
-        # copy admin key by default needed by workunits
-        vars['copy_admin_key'] = True
         if 'ceph_dev' not in vars:
             vars['ceph_dev'] = True
         if 'ceph_dev_key' not in vars:
@@ -356,6 +354,7 @@ class CephAnsible(Task):
             '.'
         ])
         self._copy_and_print_config()
+        self._generate_client_config()
         out = StringIO()
         str_args = ' '.join(args)
         ceph_installer.run(
@@ -501,6 +500,19 @@ class CephAnsible(Task):
             ceph_installer.run(args=('cat', 'ceph-ansible/inven.yml'))
             ceph_installer.run(args=('cat', 'ceph-ansible/site.yml'))
             ceph_installer.run(args=('cat', 'ceph-ansible/group_vars/all'))
+
+    def _generate_client_config(self):
+        ceph_installer = self.ceph_installer
+        ceph_installer.run(args=('touch', 'ceph-ansible/clients.yml'))
+        # copy admin key for all clients
+        ceph_installer.run(
+                            args=[
+                                run.Raw('printf "copy_admin_key: True\n"'),
+                                run.Raw('>'),
+                                'ceph-ansible/clients.yml'
+                                ]
+                           )
+        ceph_installer.run(args=('cat', 'ceph-ansible/group_vars/clients.yml'))
 
     def _create_rbd_pool(self):
         mon_node = self.ceph_installer
