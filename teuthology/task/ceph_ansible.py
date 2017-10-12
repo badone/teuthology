@@ -509,10 +509,10 @@ class CephAnsible(Task):
                             args=[
                                 run.Raw('printf "copy_admin_key: True\n"'),
                                 run.Raw('>'),
-                                'ceph-ansible/group_vars/clients.yml'
+                                'ceph-ansible/group_vars/clients'
                                 ]
                            )
-        ceph_installer.run(args=('cat', 'ceph-ansible/group_vars/clients.yml'))
+        ceph_installer.run(args=('cat', 'ceph-ansible/group_vars/clients'))
 
     def _create_rbd_pool(self):
         mon_node = self.ceph_installer
