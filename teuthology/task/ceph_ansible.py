@@ -291,6 +291,14 @@ class CephAnsible(Task):
                 '-y',
                 'ceph-ansible'])
             time.sleep(4)
+        else:
+            ceph_installer.run(args=[
+                'sudo',
+                'apt-get',
+                'install',
+                '-y',
+                'ceph-ansible'])
+            time.sleep(4)
         ceph_installer.run(args=[
             'cp',
             '-R',
