@@ -62,7 +62,8 @@ dict_templ = {
                 'mon': {
                     'debug mon': 20,
                     'debug ms': 1,
-                    'debug paxos': 20},
+                    'debug paxos': 20,
+                    'mon max pg per osd' :1200},
                 'osd': {
                     'debug filestore': 20,
                     'debug journal': 20,
