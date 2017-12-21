@@ -280,8 +280,11 @@ class CephAnsible(Task):
             (ceph_installer,) = self.ctx.cluster.only('mon.a').remotes
         from tasks.set_repo import GA_BUILDS, set_cdn_repo
         rhbuild = self.config.get('rhbuild')
-        if rhbuild in GA_BUILDS:
-            set_cdn_repo(self.ctx, self.config)
+        # skip cdn's for rhel beta tests which will use GA builds from Repo
+        if self.ctx.config.get('redhat').get('skip-subscription-manager',
+                                             False) is False:
+            if rhbuild in GA_BUILDS:
+                set_cdn_repo(self.ctx, self.config)
         # install ceph-ansible
         if ceph_installer.os.package_type == 'rpm':
             ceph_installer.run(args=[
