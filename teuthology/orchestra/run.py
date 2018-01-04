@@ -92,12 +92,8 @@ class RemoteProcess(object):
         log.getChild(self.hostname).info(u"{prefix} {cmd!r}".format(
             cmd=self.command, prefix=prefix))
 
-        if hasattr(self, 'timeout'):
-            (self._stdin_buf, self._stdout_buf, self._stderr_buf) = \
+        (self._stdin_buf, self._stdout_buf, self._stderr_buf) = \
                 self.client.exec_command(self.command, timeout=self.timeout)
-        else:
-            (self._stdin_buf, self._stdout_buf, self._stderr_buf) = \
-                self.client.exec_command(self.command)
         (self.stdin, self.stdout, self.stderr) = \
             (self._stdin_buf, self._stdout_buf, self._stderr_buf)
 
