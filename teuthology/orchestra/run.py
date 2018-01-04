@@ -70,8 +70,7 @@ class RemoteProcess(object):
 
         self.check_status = check_status
         self.label = label
-        if timeout:
-            self.timeout = timeout
+        self.timeout = timeout
         if hostname:
             self.hostname = hostname
         else:
