@@ -84,7 +84,7 @@ def _setup_latest_repo(ctx, config):
         for remote in ctx.cluster.remotes.iterkeys():
             if remote.os.package_type == 'rpm':
                 # skip is required for beta iso testing
-                remote.run(args=['sudo', 'rm', run.Raw('/etc/yum.repos.d/rh*')])
+                remote.run(args=['sudo', 'rm', run.Raw('/etc/yum.repos.d/rh*')], check_status=False)
                 remote.run(args=['sudo', 'yum', 'clean', 'metadata'])
                 remote.run(args=['sudo', 'yum', 'update', 'metadata'])
                 if config.get('skip-subscription-manager', False) is True:
