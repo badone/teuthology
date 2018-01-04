@@ -89,8 +89,8 @@ class RemoteProcess(object):
         prefix = "Running:"
         if self.label:
             prefix = "Running ({label}):".format(label=self.label)
-        log.getChild(self.hostname).info(u"{prefix} {cmd!r}".format(
-            cmd=self.command, prefix=prefix))
+        log.getChild(self.hostname).info(u"{prefix} {timeout} {cmd!r},".format(
+            cmd=self.command, prefix=prefix, timeout=self.timeout))
 
         (self._stdin_buf, self._stdout_buf, self._stderr_buf) = \
                 self.client.exec_command(self.command, timeout=self.timeout)
