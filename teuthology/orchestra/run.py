@@ -358,7 +358,7 @@ def run(
     wait=True,
     name=None,
     label=None,
-    timeout=None,
+    timeout=900,
     cwd=None,
 ):
     """
