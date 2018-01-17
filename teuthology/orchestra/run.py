@@ -37,7 +37,7 @@ class RemoteProcess(object):
     deadlock_warning = "Using PIPE for %s without wait=False would deadlock"
 
     def __init__(self, client, args, check_status=True, hostname=None,
-                 label=None, timeout=900, wait=True, logger=None, cwd=None):
+                 label=None, timeout=1800, wait=True, logger=None, cwd=None):
         """
         Create the object. Does not initiate command execution.
 
@@ -358,7 +358,7 @@ def run(
     wait=True,
     name=None,
     label=None,
-    timeout=900,
+    timeout=1800,
     cwd=None,
 ):
     """
