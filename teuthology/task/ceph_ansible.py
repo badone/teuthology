@@ -25,7 +25,8 @@ class CephAnsible(Task):
     - ceph-ansible:
         repo: {git_base}ceph-ansible.git
         branch: mybranch # defaults to master
-        ansible-version: 2.4 # defaults to 2.5
+        ansible-version: 2.4 # Default is version specified by ceph-ansible's
+                             # requirements.txt
         vars:
           ceph_dev: True ( default)
           ceph_conf_overrides:
@@ -408,9 +409,6 @@ class CephAnsible(Task):
         branch = 'master'
         if self.config.get('branch'):
             branch = self.config.get('branch')
-        ansible_ver = 'ansible==2.5'
-        if self.config.get('ansible-version'):
-            ansible_ver = 'ansible==' + self.config.get('ansible-version')
         ceph_installer.run(
             args=[
                 'rm',
@@ -446,10 +444,24 @@ class CephAnsible(Task):
             run.Raw(';'),
             'pip',
             'install',
-            run.Raw('setuptools>=11.3'),
-            run.Raw('notario>=0.0.13'), # FIXME: use requirements.txt
-            run.Raw('netaddr'),
-            run.Raw(ansible_ver),
+            '-r',
+            'tests/requirements.txt'
+        ])
+        if self.config.get('ansible-version'):
+            ansible_ver = 'ansible==' + str(self.config.get('ansible-version'))
+            ceph_installer.run(args=[
+                run.Raw('cd ~/ceph-ansible'),
+                run.Raw(';'),
+                run.Raw('source venv/bin/activate'),
+                run.Raw(';'),
+                'pip',
+                'install',
+                run.Raw(ansible_ver)
+            ])
+        ceph_installer.run(args=[
+            run.Raw('cd ~/ceph-ansible'),
+            run.Raw(';'),
+            run.Raw('source venv/bin/activate'),
             run.Raw(';'),
             run.Raw(str_args)
         ])
